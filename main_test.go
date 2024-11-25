@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -100,6 +101,88 @@ func TestHandleCreate(t *testing.T) {
 	checkStatusCode(t, rr, http.StatusSeeOther)
 	checkFileExists(t, "posts/test-post.md")
 	removeDummyFile(t, "posts/test-post.md")
+}
+
+func TestHandleEdit(t *testing.T) {
+	// Setup test file
+	testContent := "Test content"
+	err := os.MkdirAll("posts", 0755)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = os.WriteFile("posts/test-post.md", []byte(testContent), 0600)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll("posts")
+
+	// Test successful edit page load
+	req, rr := createRequestResponse("GET", "/edit/test-post.md", nil)
+	handler := http.HandlerFunc(handleEdit)
+	handler.ServeHTTP(rr, req)
+	checkStatusCode(t, rr, http.StatusOK)
+	if !strings.Contains(rr.Body.String(), testContent) {
+		t.Errorf("Expected response body to contain %q", testContent)
+	}
+
+	// Test non-existent file
+	req, rr = createRequestResponse("GET", "/edit/nonexistent.md", nil)
+	handler.ServeHTTP(rr, req)
+	checkStatusCode(t, rr, http.StatusInternalServerError)
+
+	// Test invalid file path
+	req, rr = createRequestResponse("GET", "/edit/../sensitive.md", nil)
+	handler.ServeHTTP(rr, req)
+	checkStatusCode(t, rr, http.StatusInternalServerError)
+}
+
+func TestHandleUpdate(t *testing.T) {
+	// Setup test directory
+	testContent := "Test content"
+	err := os.MkdirAll("posts", 0755)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = os.WriteFile("posts/test-post.md", []byte(testContent), 0600)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll("posts")
+
+	// Test method not allowed
+	req, rr := createRequestResponse("GET", "/update", nil)
+	handler := http.HandlerFunc(handleUpdate)
+	handler.ServeHTTP(rr, req)
+	checkStatusCode(t, rr, http.StatusMethodNotAllowed)
+
+	// Test missing title and content
+	req, rr = createRequestResponse("POST", "/update", strings.NewReader(""))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	handler.ServeHTTP(rr, req)
+	checkStatusCode(t, rr, http.StatusBadRequest)
+
+	// Test missing content
+	req, rr = createRequestResponse("POST", "/update", strings.NewReader("title=Test+Post"))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	handler.ServeHTTP(rr, req)
+	checkStatusCode(t, rr, http.StatusBadRequest)
+
+	// Test successful update
+	req, rr = createRequestResponse("POST", "/update", strings.NewReader("title=Test+Post&content=Updated+content"))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	handler.ServeHTTP(rr, req)
+	checkStatusCode(t, rr, http.StatusSeeOther)
+
+	// Verify file was created and contains correct content
+	filePath := filepath.Join("posts", "test-post.md")
+	checkFileExists(t, filePath)
+	content, err := os.ReadFile(filePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(content) != "Updated content" {
+		t.Errorf("Expected file content to be %q, got %q", "Updated content", string(content))
+	}
 }
 
 // Test Utility Functions

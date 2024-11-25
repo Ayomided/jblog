@@ -1,41 +1,56 @@
-<!DOCTYPE html>
+<!doctype html>
 <html>
-<head>
-    <title>{{.Title}} - Blog</title>
-    <style>
-        body {
-            max-width: 800px;
-            margin: 0 auto;
-            padding: 20px;
-            font-family: 'Arial', sans-serif;
-            background-color: #ffffff;
-            color: #333;
-        }
-        .date {
-            color: #666;
-            font-size: 0.9em;
-        }
-        .content {
-            line-height: 1.6;
-        }
-        .back {
-            margin-bottom: 20px;
-        }
-        a {
-            color: #1a73e8;
-            text-decoration: none;
-        }
-        a:hover {
-            text-decoration: underline;
-        }
-    </style>
-</head>
-<body>
-    <div class="back"><a href="/">← Back to Home</a></div>
-    <h1>{{.Title}}</h1>
-    <div class="date">{{.Date.Format "January 2, 2006"}}</div>
-    <div class="content">
-        {{.Content}}
-    </div>
-</body>
+    <head>
+        <title>{{.Post.Title}} - Blog</title>
+        <style>
+            body {
+                max-width: 800px;
+                margin: 0 auto;
+                padding: 20px;
+                font-family: "Arial", sans-serif;
+                background-color: #ffffff;
+                color: #333;
+            }
+            .date {
+                color: #666;
+                font-size: 0.9em;
+            }
+            .content {
+                line-height: 1.6;
+            }
+            .back {
+                margin-bottom: 20px;
+            }
+            a {
+                color: #1a73e8;
+                text-decoration: none;
+            }
+            a:hover {
+                text-decoration: underline;
+            }
+            .top-nav {
+                display: flex;
+                flex-direction: row;
+                justify-content: space-between;
+            }
+            .edit {
+                margin-bottom: 20px;
+            }
+        </style>
+    </head>
+    <body>
+        {{if .IsAuthenticated}}
+        <div class="top-nav">
+            <div class="back"><a href="/">← Back to Home</a></div>
+            <div class="edit"><a href="/edit/{{.FileName}}">Edit</a></div>
+        </div>
+        {{else}}
+        <div class="top-nav">
+            <div class="back"><a href="/">← Back to Home</a></div>
+        </div>
+        {{end}}
+        <h1>{{.Post.Title}}</h1>
+        <div class="date">{{.Post.Date.Format "January 2, 2006"}}</div>
+        <div class="content">{{.Post.Content}}</div>
+    </body>
 </html>

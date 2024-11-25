@@ -14,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	md "github.com/JohannesKaufmann/html-to-markdown"
 	"github.com/getsentry/sentry-go"
 	"github.com/gomarkdown/markdown"
 )
@@ -27,6 +28,7 @@ type BlogPost struct {
 }
 
 var (
+	converter    = md.NewConverter("", true, nil)
 	username     = getEnvOrDefault("JBLOG_USERNAME", "admin")
 	password     = getEnvOrDefault("JBLOG_PASSWORD", "changeme")
 	isProduction = getEnvOrDefault("GO_ENV", "development") == "production"
@@ -71,6 +73,8 @@ func setupHandlers() *http.ServeMux {
 	router.HandleFunc("/logout", handleLogout)
 	router.HandleFunc("/admin", basicAuth(handleAdmin))
 	router.HandleFunc("/create", basicAuth(handleCreate))
+	router.HandleFunc("/edit/", basicAuth(handleEdit))
+	router.HandleFunc("/update", basicAuth(handleUpdate))
 
 	return router
 }
@@ -134,7 +138,6 @@ func handlePost(w http.ResponseWriter, r *http.Request) {
 
 	filename := strings.TrimPrefix(r.URL.Path, "/post/")
 	post, err := loadBlogPost(filename)
-
 	if err != nil {
 		http.Error(w, "Post not found", http.StatusNotFound)
 
@@ -145,7 +148,17 @@ func handlePost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	renderTemplate(w, "templates/post.html", post)
+	data := struct {
+		Post            BlogPost
+		FileName        string
+		IsAuthenticated bool
+	}{
+		Post:            post,
+		FileName:        filename,
+		IsAuthenticated: isUserAuthenticated(r),
+	}
+
+	renderTemplate(w, "templates/post.html", data)
 }
 
 // handleLogin handles the login page request
@@ -193,6 +206,66 @@ func handleAdmin(w http.ResponseWriter, r *http.Request) {
 // handleCreate handles the creation of a new blog post
 func handleCreate(w http.ResponseWriter, r *http.Request) {
 	log.Println("Handling create post request with method:", r.Method)
+
+	if r.Method != "POST" {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	title := r.FormValue("title")
+	content := r.FormValue("content")
+
+	if title == "" || content == "" {
+		http.Error(w, "Title and content are required", http.StatusBadRequest)
+		return
+	}
+
+	filename := strings.ToLower(strings.ReplaceAll(title, " ", "-")) + ".md"
+	filepath := filepath.Join("posts", filename)
+
+	if err := os.WriteFile(filepath, []byte(content), 0600); err != nil {
+		http.Error(w, "Error saving post", http.StatusInternalServerError)
+		sentry.CaptureException(err)
+
+		return
+	}
+
+	http.Redirect(w, r, "/", http.StatusSeeOther)
+}
+
+// handleEdit handles the edit page request
+func handleEdit(w http.ResponseWriter, r *http.Request) {
+	filename := strings.TrimPrefix(r.URL.Path, "/edit/")
+	post, err := loadBlogPost(filename)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		sentry.CaptureException(err)
+
+		return
+	}
+
+	markd, err := converter.ConvertString(string(post.Content))
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	data := struct {
+		Post      BlogPost
+		CSRFToken string
+		Content   string
+	}{
+		Post:      post,
+		CSRFToken: "",
+		Content:   markd,
+	}
+
+	log.Println("Handling edit page request")
+	renderTemplate(w, "templates/edit.html", data)
+}
+
+// handleEdit handles the editing of an existing blog post
+func handleUpdate(w http.ResponseWriter, r *http.Request) {
+	log.Println("Handling edit post request with method:", r.Method)
 
 	if r.Method != "POST" {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)

@@ -1,7 +1,7 @@
 <!doctype html>
 <html>
     <head>
-        <title>New - Post</title>
+        <title>Update - {{.Post.Title}} - Post</title>
         <style>
             body {
                 max-width: 800px;
@@ -51,21 +51,21 @@
     </head>
     <body>
         <div class="nav">
-            <h1>New Post</h1>
+            <h1>Update Post</h1>
             <p><a href="/">← Back to Home</a></p>
         </div>
 
-        <form method="POST" action="/create">
+        <form method="POST" action="/update">
             <input type="hidden" name="csrf_token" value="{{.CSRFToken}}" />
             <div class="form-group">
                 <label for="title">Title:</label>
-                <input type="text" id="title" name="title" required />
+                <input type="text" id="title" name="title" value="{{.Post.Title}}" required />
             </div>
             <div class="form-group">
                 <label for="content">Content (Markdown):</label>
-                <textarea id="content" name="content" required></textarea>
+                <textarea id="content" name="content" value="{{.Content}}" required>{{.Content}}</textarea>
             </div>
-            <button type="submit">Create Post</button>
+            <button type="submit">Update Post</button>
         </form>
     </body>
 </html>
